@@ -1,4 +1,4 @@
-# python_pkg_template
+# rlbench_utils
 
 Some sample text for the website.
 
