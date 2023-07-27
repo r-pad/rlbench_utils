@@ -4,18 +4,27 @@ version = "0.1.0"
 description = "A Python Package Template"
 readme = "README.md"
 requires-python = ">=3.6"
-license = {file = "LICENSE.txt"}
-authors = [
-  {email = "baeisner@andrew.cmu.edu", name = "Ben Eisner"}
+license = { file = "LICENSE.txt" }
+authors = [{ email = "baeisner@andrew.cmu.edu", name = "Ben Eisner" }]
+dependencies = [
+  "torch",
+  "torchvision",
+
+  # Pyrep requirements. https://github.com/stepjam/PyRep/blob/master/requirements.txt
+  "pyrep", # Should already be installed.
+  "numpy",
+
+  # RLBench requirements.
+  "rlbench @ git+https://github.com/stepjam/RLBench.git@55e723d9400b54d37e6077ea2753e64874bc4639#egg=rlbench",
+  "Pillow",
+  "pyquaternion",
+  "html-testRunner",
+  "setuptools",
+  "natsort",
 ]
-dependencies = []
 
 [build-system]
-requires = [
-  "setuptools >= 62.3.2",
-  "setuptools-scm",
-  "wheel",
-]
+requires = ["cffi==1.14.2", "setuptools >= 62.3.2", "setuptools-scm", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
@@ -28,13 +37,8 @@ develop = [
   "pytest == 7.3.2",
   "pre-commit == 3.3.3",
 ]
-notebooks = [
-  "jupyter",
-]
-build_docs = [
-  "mkdocs-material",
-  "mkdocstrings[python]",
-]
+notebooks = ["jupyter"]
+build_docs = ["mkdocs-material", "mkdocstrings[python]"]
 
 # This is required to allow us to have notebooks/ at the top level.
 [tool.setuptools.packages.find]
