@@ -1,33 +1,79 @@
-import functools
 import logging
-from typing import Dict
+from enum import Enum
+from typing import Any, Dict
 
 import numpy as np
+import rlbench.backend.observation
+import rlbench.demo
 import torch
 import torch.utils.data as data
+from pyrep.backend import sim
 from rlbench.action_modes.action_mode import MoveArmThenGripper
 from rlbench.action_modes.arm_action_modes import JointVelocity
 from rlbench.action_modes.gripper_action_modes import Discrete
 from rlbench.environment import Environment
 from rlbench.tasks import StackWine
 
-TASK_DICT = {
+
+class StackWinePhase(str, Enum):
+    GRASP = "grasp"
+    PLACE = "place"
+
+
+_TASK_HANDLES = {
     "stack_wine": {
         "task_class": StackWine,
-        "action_obj_ids": [160],
-        "anchor_obj_ids": [152, 154],
+        "phase": {
+            "grasp": {
+                "action_obj_handles": [221, 222, 225],
+                "anchor_obj_handles": [160],
+            },
+            "place": {
+                "action_obj_handles": [160],
+                "anchor_obj_handles": [152, 154],
+            },
+        },
     },
 }
 
+TASK_DICT = {
+    "stack_wine": {
+        "task_class": StackWine,
+        "phase": {
+            "grasp": {
+                "action_obj_names": [
+                    "Panda_leftfinger_visual",
+                    "Panda_rightfinger_visual",
+                    "Panda_gripper_visual",
+                ],
+                "anchor_obj_names": ["wine_bottle_visual"],
+            },
+            "place": {
+                "action_obj_names": ["wine_bottle_visual"],
+                "anchor_obj_names": ["rack_bottom_visual", "rack_top_visual"],
+            },
+        },
+    }
+}
 
-# Get get rgb and point cloud for all points whose mask matches in list of ids
-def get_rgb_point_cloud_by_mask(rgb, point_cloud, mask, ids):
-    # Get the indices of the points which match the ids.
-    indices = np.isin(mask, ids).reshape((-1))
-    # Get the rgb and point cloud for the indices.
+
+def get_rgb_point_cloud_by_object_handles(rgb, point_cloud, seg_labels, handles):
+    indices = np.isin(seg_labels, handles).reshape((-1))
     rgb = rgb[indices]
     point_cloud = point_cloud[indices]
     return rgb, point_cloud
+
+
+# Get rgb and point cloud for all points whose mask matches the given handles.
+def get_rgb_point_cloud_by_object_names(rgb, point_cloud, seg_labels, names):
+    handles = []
+    for name in names:
+        try:
+            handles.append(sim.simGetObjectHandle(name))
+        except RuntimeError:
+            logging.warning(f"Object {name} not found in scene.")
+
+    return get_rgb_point_cloud_by_object_handles(rgb, point_cloud, seg_labels, handles)
 
 
 def obs_to_rgb_point_cloud(obs):
@@ -79,7 +125,11 @@ def obs_to_rgb_point_cloud(obs):
 
 class RLBenchPlacementDataset(data.Dataset):
     def __init__(
-        self, dataset_root: str, task_name: str = "stack_wine", n_demos: int = 10
+        self,
+        dataset_root: str,
+        task_name: str = "stack_wine",
+        n_demos: int = 10,
+        phase: StackWinePhase = StackWinePhase.GRASP,
     ) -> None:
         """Dataset for RL-Bench placement tasks.
 
@@ -91,6 +141,7 @@ class RLBenchPlacementDataset(data.Dataset):
         self.dataset_root = dataset_root
         self.task_name = task_name
         self.n_demos = n_demos
+        self.phase = phase
 
         if self.task_name not in TASK_DICT:
             raise ValueError(f"Task name {self.task_name} not supported.")
@@ -99,7 +150,7 @@ class RLBenchPlacementDataset(data.Dataset):
         self.demos = self._load_demos()
         logging.info("Demos loaded!")
 
-    def _load_demos(self) -> None:
+    def _load_demos(self) -> Any:
         action_mode = MoveArmThenGripper(
             arm_action_mode=JointVelocity(), gripper_action_mode=Discrete()
         )
@@ -114,22 +165,41 @@ class RLBenchPlacementDataset(data.Dataset):
 
         return demos
 
-    @functools.cache
+    # @functools.cache
     def get_item(self, index: int) -> Dict[str, torch.Tensor]:
-        demo = self.demos[index]
-        final_obs = demo[-1]
+        demo: rlbench.demo.Demo = self.demos[index]
+
+        # Find the first grasp instance
+
+        if self.phase == "grasp":
+            first_grasp_ix = list(
+                filter(lambda t: t[1].gripper_open == 0.0, enumerate(demo))
+            )[0][0]
+
+            last_open_ix = first_grasp_ix - 1
+            assert last_open_ix >= 0
+
+            key_obs = demo[last_open_ix]
+        elif self.phase == "place":
+            key_obs = demo[-1]
 
         # Merge all the point clouds and masks into one.
-        rgb, point_cloud, mask = obs_to_rgb_point_cloud(final_obs)
+        rgb, point_cloud, mask = obs_to_rgb_point_cloud(key_obs)
 
         # Filter the rgb and point cloud for the action and anchor objects.
-        action_rgb, action_point_cloud = get_rgb_point_cloud_by_mask(
-            rgb, point_cloud, mask, TASK_DICT[self.task_name]["action_obj_ids"]
+        action_rgb, action_point_cloud = get_rgb_point_cloud_by_object_handles(
+            rgb,
+            point_cloud,
+            mask,
+            _TASK_HANDLES[self.task_name]["phase"][self.phase]["action_obj_handles"],
         )
 
         # Get the rgb and point cloud for the anchor objects.
-        anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_mask(
-            rgb, point_cloud, mask, TASK_DICT[self.task_name]["anchor_obj_ids"]
+        anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_object_handles(
+            rgb,
+            point_cloud,
+            mask,
+            _TASK_HANDLES[self.task_name]["phase"][self.phase]["anchor_obj_handles"],
         )
 
         return {
@@ -163,4 +233,5 @@ class RLBenchPlacementDatasetRepeat(RLBenchPlacementDataset):
         return self.repeat * len(self.demos)
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
+        return self.get_item(index % len(self.demos))
         return self.get_item(index % len(self.demos))
