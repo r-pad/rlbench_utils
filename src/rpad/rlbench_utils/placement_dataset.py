@@ -1,8 +1,9 @@
+import functools
 import logging
 import os
 import pickle
 from enum import Enum
-from typing import Any, Dict
+from typing import Dict, cast
 
 import numpy as np
 import rlbench.backend.observation
@@ -11,6 +12,7 @@ import rlbench.utils
 import torch
 import torch.utils.data as data
 import tree
+from joblib import Memory
 from pyrep.backend import sim
 from rlbench.observation_config import CameraConfig, ObservationConfig
 from rlbench.tasks import (
@@ -27,22 +29,6 @@ class StackWinePhase(str, Enum):
     GRASP = "grasp"
     PLACE = "place"
 
-
-# _TASK_HANDLES = {
-#     "stack_wine": {
-#         "task_class": StackWine,
-#         "phase": {
-#             "grasp": {
-#                 "action_obj_handles": [221, 222, 225],
-#                 "anchor_obj_handles": [160],
-#             },
-#             "place": {
-#                 "action_obj_handles": [160],
-#                 "anchor_obj_handles": [152, 154],
-#             },
-#         },
-#     },
-# }
 
 TASK_DICT = {
     "stack_wine": {
@@ -193,28 +179,6 @@ def obs_to_rgb_point_cloud(obs):
     front_point_cloud = front_point_cloud.reshape((-1, 3))
     wrist_point_cloud = wrist_point_cloud.reshape((-1, 3))
 
-    # # Transform each point cloud into the world frame.
-    # def transform_point_cloud(point_cloud, camera_extrinsics):
-    #     point_cloud = np.hstack((point_cloud, np.ones((point_cloud.shape[0], 1))))
-    #     point_cloud = np.matmul(np.linalg.inv(camera_extrinsics), point_cloud.T).T
-    #     return point_cloud[:, :3]
-
-    # overhead_point_cloud = transform_point_cloud(
-    #     overhead_point_cloud, obs.misc["overhead_camera_extrinsics"]
-    # )
-    # left_point_cloud = transform_point_cloud(
-    #     left_point_cloud, obs.misc["left_shoulder_camera_extrinsics"]
-    # )
-    # right_point_cloud = transform_point_cloud(
-    #     right_point_cloud, obs.misc["right_shoulder_camera_extrinsics"]
-    # )
-    # front_point_cloud = transform_point_cloud(
-    #     front_point_cloud, obs.misc["front_camera_extrinsics"]
-    # )
-    # wrist_point_cloud = transform_point_cloud(
-    #     wrist_point_cloud, obs.misc["wrist_camera_extrinsics"]
-    # )
-
     # Reshape the masks into Nx1 arrays.
     overhead_mask = overhead_mask.reshape((-1, 1))
     left_mask = left_mask.reshape((-1, 1))
@@ -264,12 +228,12 @@ def load_handle_mapping(
     with open(handle_path, "rb") as f:
         names_to_handles = pickle.load(f)
 
-    return names_to_handles
+    return cast(Dict[str, int], names_to_handles)
 
 
 def load_state_pos_dict(
     dataset_root: str, task_name: str, variation: int, episode: int
-) -> Dict[str, np.ndarray]:
+) -> Dict[str, int]:
     state_path = os.path.join(
         dataset_root,
         task_name,
@@ -282,7 +246,7 @@ def load_state_pos_dict(
     with open(state_path, "rb") as f:
         state_pos_dict = pickle.load(f)
 
-    return state_pos_dict
+    return cast(Dict[str, int], state_pos_dict)
 
 
 class RLBenchPlacementDataset(data.Dataset):
@@ -292,6 +256,7 @@ class RLBenchPlacementDataset(data.Dataset):
         task_name: str = "stack_wine",
         n_demos: int = 10,
         phase: StackWinePhase = StackWinePhase.GRASP,
+        cache: bool = True,
     ) -> None:
         """Dataset for RL-Bench placement tasks.
 
@@ -304,51 +269,55 @@ class RLBenchPlacementDataset(data.Dataset):
         self.task_name = task_name
         self.n_demos = n_demos
         self.phase = phase
+        self.variation = 0
 
         if self.task_name not in TASK_DICT:
             raise ValueError(f"Task name {self.task_name} not supported.")
 
-        logging.info(f"Loading {self.n_demos} demos for task {self.task_name}...")
-        self.demos, self.names_to_handles = self._load_demos()
-        logging.info("Demos loaded!")
-
-    def _load_demos(self) -> Any:
-        ## This is overkill! We don't actually need to make the environment...
-        # action_mode = MoveArmThenGripper(
-        #     arm_action_mode=JointVelocity(), gripper_action_mode=Discrete()
-        # )
-
-        # env = Environment(action_mode, self.dataset_root, headless=True)
-        # env.launch()
-
-        # task_env = env.get_task(TASK_DICT[self.task_name]["task_class"])
-        # task_env.set_variation(0)
-        # descriptions, _ = task_env.reset()
-
-        # demos = task_env.get_demos(
-        #     self.n_demos, live_demos=False, random_selection=False
-        # )
-        variation = 0
-
-        names_to_handles = load_handle_mapping(
-            self.dataset_root, self.task_name, variation
+        handle_mapping = load_handle_mapping(
+            self.dataset_root, self.task_name, self.variation
         )
 
         def leaf_fn(path, x):
             if path[1] == "action_obj_names" or path[1] == "anchor_obj_names":
-                return names_to_handles[x]
+                return handle_mapping[x]
             else:
                 return x
 
-        obj_handles = tree.map_structure_with_path(
+        # Get a mapping from object names to handles.
+        # TODO: rename the keys from "*_obj_names" to "*_obj_handles".
+        self.names_to_handles = tree.map_structure_with_path(
             leaf_fn, TASK_DICT[self.task_name]["phase"]
         )
 
-        demos = rlbench.utils.get_stored_demos(
-            amount=self.n_demos,
+        if cache:
+            self.memory = Memory(
+                location=os.path.join(dataset_root, f".cache/{task_name}")
+            )
+        else:
+            self.memory = None
+
+    def __len__(self) -> int:
+        return self.n_demos
+
+    # We also cache in memory, since all the transformations are the same.
+    # Saves a lot of time when loading the dataset, but don't have to worry
+    # about logic changes after the fact.
+    @functools.lru_cache(maxsize=100)
+    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
+        # NOTE: We are caching the outputs since it's a royal pain to load the
+        # demonstrations from disk. But this means that we'll have to be careful
+        # whenever we re-generate the demonstrations to delete the cache.
+        if self.memory is not None:
+            get_demo_fn = self.memory.cache(rlbench.utils.get_stored_demos)
+        else:
+            get_demo_fn = rlbench.utils.get_stored_demos
+
+        demo: rlbench.demo.Demo = get_demo_fn(
+            amount=1,
             image_paths=False,
             dataset_root=self.dataset_root,
-            variation_number=variation,
+            variation_number=self.variation,
             task_name=self.task_name,
             obs_config=ObservationConfig(
                 left_shoulder_camera=CameraConfig(image_size=(256, 256)),
@@ -359,33 +328,12 @@ class RLBenchPlacementDataset(data.Dataset):
                 task_low_dim_state=True,
             ),
             random_selection=False,
-            from_episode_number=0,
-        )
-
-        # Get a mapping from object names to handles.
-        # TODO: rename the keys from "*_obj_names" to "*_obj_handles".
-        # Also have to change below.
-        # for handle in sim.simGetObjects(sim.sim_handle_all):
-        #     print(handle, sim.simGetObjectName(handle))
-
-        # handle_path = os.path.join(
-        #     self.dataset_root, self.task_name, f"variation{variation}", "handles.pkl"
-        # )
-
-        # with open(handle_path, "rb") as f:
-        #     names_to_handles = pickle.load(f)
-
-        # env.shutdown()
-
-        return demos, obj_handles
-
-    # @functools.cache
-    def get_item(self, index: int) -> Dict[str, torch.Tensor]:
-        demo: rlbench.demo.Demo = self.demos[index]
+            from_episode_number=index,
+        )[0]
 
         # Each demonstration has a list of poses, which are the states of the
         low_dim_state_dict = load_state_pos_dict(
-            self.dataset_root, self.task_name, 0, index
+            self.dataset_root, self.task_name, self.variation, index
         )
 
         initial_obs = demo[0]
@@ -480,35 +428,3 @@ class RLBenchPlacementDataset(data.Dataset):
             "T_action_key_world": torch.from_numpy(T_action_key_world),
             "T_init_key": torch.from_numpy(T_init_key),
         }
-
-    def __len__(self) -> int:
-        return len(self.demos)
-
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
-        return self.get_item(index)
-
-
-# Write a class which inheits from the above dataset, but accepts an
-# argument which repeats the dataset K times.
-class RLBenchPlacementDatasetRepeat(RLBenchPlacementDataset):
-    def __init__(
-        self,
-        dataset_root: str,
-        task_name: str = "stack_wine",
-        n_demos: int = 10,
-        repeat: int = 1,
-    ) -> None:
-        super().__init__(dataset_root, task_name, n_demos)
-        self.repeat = repeat
-
-    def __len__(self) -> int:
-        return self.repeat * len(self.demos)
-
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
-        return self.get_item(index % len(self.demos))
-
-    def __len__(self) -> int:
-        return self.repeat * len(self.demos)
-
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
-        return self.get_item(index % len(self.demos))
