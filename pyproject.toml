@@ -16,7 +16,7 @@ dependencies = [
   "numpy",
 
   # RLBench requirements.
-  "rlbench @ git+https://github.com/stepjam/RLBench.git@55e723d9400b54d37e6077ea2753e64874bc4639#egg=rlbench",
+  "rlbench @ git+https://github.com/beneisner/RLBench.git@21147e5612d8c3edbcbb50baec4ce797b0a2d2f9#egg=rlbench",
   "Pillow",
   "pyquaternion",
   "html-testRunner",

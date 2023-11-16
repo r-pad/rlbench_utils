@@ -28,6 +28,23 @@ jobs:
           python-version: '3.10'
       ##############################################
 
+      # - name: Download Coppeliasim.
+      #   run: |
+      #     wget https://www.coppeliarobotics.com/files/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz -O CoppeliaSim_Edu_V4_2_0_Ubuntu20_04.tar.xz
+      #     tar -xf CoppeliaSim_Edu_V4_2_0_Ubuntu20_04.tar.xz
+      #     mv CoppeliaSim_Edu_V4_2_0_Ubuntu20_04 coppeliasim
+      #     rm CoppeliaSim_Edu_V4_2_0_Ubuntu20_04.tar.xz
+
+      # - name: Set environment variable COPPELIASIM_ROOT
+      #   run: |
+      #     echo "COPPELIASIM_ROOT=$(pwd)/coppeliasim" >> $GITHUB_ENV
+
+      # - name: Install cffi.
+      #   run: pip install cffi==1.14.2 wheel
+
+      # - name: Install prereqs.
+      #   run: pip install --no-build-isolation "pyrep @ git+https://github.com/stepjam/PyRep.git"
+
       - name: Install package
         run: pip install "${{ inputs.install_string }}"
 
