@@ -42,11 +42,13 @@ TASK_DICT = {
                 ],
                 "anchor_obj_names": ["wine_bottle_visual"],
                 "action_pose_name": "gripper",
+                "anchor_pose_name": "wine_bottle",
             },
             "place": {
                 "action_obj_names": ["wine_bottle_visual"],
                 "anchor_obj_names": ["rack_bottom_visual", "rack_top_visual"],
                 "action_pose_name": "wine_bottle",
+                "anchor_pose_name": "rack_top_visual",
             },
         },
     },
@@ -61,11 +63,13 @@ TASK_DICT = {
                 ],
                 "anchor_obj_names": ["square_ring"],
                 "action_pose_name": "gripper",
+                "anchor_pose_name": "square_ring",
             },
             "place": {
                 "action_obj_names": ["square_ring"],
                 "anchor_obj_names": ["square_base", "pillar0", "pillar1", "pillar2"],
                 "action_pose_name": "square_ring",
+                "anchor_pose_name": "square_base",
             },
         },
     },
@@ -98,11 +102,13 @@ TASK_DICT = {
                 ],
                 "anchor_obj_names": ["phone", "phone_visual"],
                 "action_pose_name": "gripper",
+                "anchor_pose_name": "phone_visual",
             },
             "place": {
                 "action_obj_names": ["phone", "phone_visual"],
                 "anchor_obj_names": ["phone_case", "phone_case_visual"],
                 "action_pose_name": "phone_visual",
+                "anchor_pose_name": "phone_case_visual",
             },
         },
     },
@@ -117,11 +123,13 @@ TASK_DICT = {
                 ],
                 "anchor_obj_names": ["toilet_roll_visual"],
                 "action_pose_name": "gripper",
+                "anchor_pose_name": "toilet_roll_visual",
             },
             "place": {
                 "action_obj_names": ["toilet_roll_visual"],
                 "anchor_obj_names": ["holder_visual", "stand_base"],
                 "action_pose_name": "toilet_roll_visual",
+                "anchor_pose_name": "holder_visual",
             },
         },
     },
@@ -397,15 +405,13 @@ class RLBenchPlacementDataset(data.Dataset):
             self.names_to_handles[self.phase]["anchor_obj_names"],
         )
 
-        def extract_action_pose(obs):
+        def extract_pose(obs, key):
             # Extract the positions.
-            action_pose_name = TASK_DICT[self.task_name]["phase"][self.phase][
-                "action_pose_name"
-            ]
-            if action_pose_name == "gripper":
+            pose_name = TASK_DICT[self.task_name]["phase"][self.phase][key]
+            if pose_name == "gripper":
                 action_pq = obs.gripper_pose
             else:
-                start = low_dim_state_dict[action_pose_name]
+                start = low_dim_state_dict[pose_name]
                 end = start + 7
                 action_pq = obs.task_low_dim_state[start:end]
 
@@ -417,9 +423,10 @@ class RLBenchPlacementDataset(data.Dataset):
             return T_action_world
 
         # Get initial, key, and relative.
-        T_action_init_world = extract_action_pose(initial_obs)
-        T_action_key_world = extract_action_pose(key_obs)
+        T_action_init_world = extract_pose(initial_obs, "action_pose_name")
+        T_action_key_world = extract_pose(key_obs, "action_pose_name")
         T_init_key = T_action_key_world @ np.linalg.inv(T_action_init_world)
+        T_anchor_key_world = extract_pose(key_obs, "anchor_pose_name")
 
         return {
             "init_action_rgb": torch.from_numpy(init_action_rgb),
@@ -432,5 +439,6 @@ class RLBenchPlacementDataset(data.Dataset):
             "key_anchor_pc": torch.from_numpy(key_anchor_point_cloud),
             "T_action_init_world": torch.from_numpy(T_action_init_world),
             "T_action_key_world": torch.from_numpy(T_action_key_world),
+            "T_anchor_key_world": torch.from_numpy(T_anchor_key_world),
             "T_init_key": torch.from_numpy(T_init_key),
         }
