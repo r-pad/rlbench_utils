@@ -97,10 +97,12 @@ TASK_DICT = {
                     "Panda_gripper_visual",
                 ],
                 "anchor_obj_names": ["phone", "phone_visual"],
+                "action_pose_name": "gripper",
             },
             "place": {
                 "action_obj_names": ["phone", "phone_visual"],
                 "anchor_obj_names": ["phone_case", "phone_case_visual"],
+                "action_pose_name": "phone_visual",
             },
         },
     },
@@ -114,10 +116,12 @@ TASK_DICT = {
                     "Panda_gripper_visual",
                 ],
                 "anchor_obj_names": ["toilet_roll_visual"],
+                "action_pose_name": "gripper",
             },
             "place": {
                 "action_obj_names": ["toilet_roll_visual"],
                 "anchor_obj_names": ["holder_visual", "stand_base"],
+                "action_pose_name": "toilet_roll_visual",
             },
         },
     },
@@ -350,6 +354,8 @@ class RLBenchPlacementDataset(data.Dataset):
             key_obs = demo[last_open_ix]
         elif self.phase == "place":
             key_obs = demo[-1]
+        else:
+            raise ValueError(f"Phase {self.phase} not supported.")
 
         # Merge all the initial point clouds and masks into one.
         init_rgb, init_point_cloud, init_mask = obs_to_rgb_point_cloud(initial_obs)
