@@ -21,6 +21,7 @@ from rlbench.tasks import (
     PhoneOnBase,
     PlaceHangerOnRack,
     PutToiletRollOnStand,
+    SolvePuzzle,
     StackWine,
 )
 from scipy.spatial.transform import Rotation as R
@@ -158,6 +159,28 @@ TASK_DICT = {
                 ],
                 "action_pose_name": "clothes_hanger_visual",
                 "anchor_pose_name": "clothes_rack",
+            },
+        },
+    },
+    "solve_puzzle": {
+        "task_class": SolvePuzzle,
+        "phase": {
+            "grasp": {
+                "action_obj_names": [
+                    "Panda_leftfinger_visual",
+                    "Panda_rightfinger_visual",
+                    "Panda_gripper_visual",
+                ],
+                "anchor_obj_names": ["solve_puzzle_piece_visual2"],
+                "action_pose_name": "gripper",
+                "anchor_pose_name": "solve_puzzle_frame",
+            },
+            "place": {
+                "action_obj_names": ["solve_puzzle_piece_visual2"],
+                "anchor_obj_names": ["solve_puzzle_frame", "solve_puzzle_piece1"]
+                + [f"solve_puzzle_piece{i}" for i in range(3, 25)],
+                "action_pose_name": "solve_puzzle_piece_visual2",
+                "anchor_pose_name": "solve_puzzle_frame",
             },
         },
     },
