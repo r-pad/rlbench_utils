@@ -19,6 +19,7 @@ from rlbench.tasks import (
     InsertOntoSquarePeg,
     InsertUsbInComputer,
     PhoneOnBase,
+    PlaceHangerOnRack,
     PutToiletRollOnStand,
     StackWine,
 )
@@ -130,6 +131,33 @@ TASK_DICT = {
                 "anchor_obj_names": ["holder_visual", "stand_base"],
                 "action_pose_name": "toilet_roll_visual",
                 "anchor_pose_name": "holder_visual",
+            },
+        },
+    },
+    "place_hanger_on_rack": {
+        "task_class": PlaceHangerOnRack,
+        "phase": {
+            "grasp": {
+                "action_obj_names": [
+                    "Panda_leftfinger_visual",
+                    "Panda_rightfinger_visual",
+                    "Panda_gripper_visual",
+                ],
+                "anchor_obj_names": ["clothes_hanger_visual"],
+                "action_pose_name": "gripper",
+                "anchor_pose_name": "clothes_hanger_visual",
+            },
+            "place": {
+                "action_obj_names": ["clothes_hanger_visual"],
+                "anchor_obj_names": [
+                    "clothes_rack",
+                    "clothes_rack_sub2",
+                    "clothes_rack_sub3",
+                    "hanger_holder",
+                    "hanger_holder0",
+                ],
+                "action_pose_name": "clothes_hanger_visual",
+                "anchor_pose_name": "clothes_rack",
             },
         },
     },
