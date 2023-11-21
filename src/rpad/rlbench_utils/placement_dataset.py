@@ -173,14 +173,14 @@ TASK_DICT = {
                 ],
                 "anchor_obj_names": ["solve_puzzle_piece_visual2"],
                 "action_pose_name": "gripper",
-                "anchor_pose_name": "solve_puzzle_frame",
+                "anchor_pose_name": "solve_puzzle_piece_visual2",
             },
             "place": {
                 "action_obj_names": ["solve_puzzle_piece_visual2"],
-                "anchor_obj_names": ["solve_puzzle_frame", "solve_puzzle_piece1"]
+                "anchor_obj_names": ["solve_puzzle_piece1"]
                 + [f"solve_puzzle_piece{i}" for i in range(3, 25)],
                 "action_pose_name": "solve_puzzle_piece_visual2",
-                "anchor_pose_name": "solve_puzzle_frame",
+                "anchor_pose_name": "solve_puzzle_piece1",
             },
         },
     },
