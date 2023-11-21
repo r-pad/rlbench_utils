@@ -154,8 +154,6 @@ TASK_DICT = {
                     "clothes_rack",
                     "clothes_rack_sub2",
                     "clothes_rack_sub3",
-                    "hanger_holder",
-                    "hanger_holder0",
                 ],
                 "action_pose_name": "clothes_hanger_visual",
                 "anchor_pose_name": "clothes_rack",
