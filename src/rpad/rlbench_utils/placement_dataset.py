@@ -1,9 +1,7 @@
-import functools
 import logging
 import os
 import pickle
-from enum import Enum
-from typing import Dict, cast
+from typing import Dict, List, Literal, Union, cast
 
 import numpy as np
 import rlbench.backend.observation
@@ -15,174 +13,10 @@ import tree
 from joblib import Memory
 from pyrep.backend import sim
 from rlbench.observation_config import CameraConfig, ObservationConfig
-from rlbench.tasks import (
-    InsertOntoSquarePeg,
-    InsertUsbInComputer,
-    PhoneOnBase,
-    PlaceHangerOnRack,
-    PutToiletRollOnStand,
-    SolvePuzzle,
-    StackWine,
-)
 from scipy.spatial.transform import Rotation as R
 
-
-class StackWinePhase(str, Enum):
-    GRASP = "grasp"
-    PLACE = "place"
-
-
-TASK_DICT = {
-    "stack_wine": {
-        "task_class": StackWine,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["wine_bottle_visual"],
-                "action_pose_name": "gripper",
-                "anchor_pose_name": "wine_bottle",
-            },
-            "place": {
-                "action_obj_names": ["wine_bottle_visual"],
-                "anchor_obj_names": ["rack_bottom_visual", "rack_top_visual"],
-                "action_pose_name": "wine_bottle",
-                "anchor_pose_name": "rack_top_visual",
-            },
-        },
-    },
-    "insert_onto_square_peg": {
-        "task_class": InsertOntoSquarePeg,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["square_ring"],
-                "action_pose_name": "gripper",
-                "anchor_pose_name": "square_ring",
-            },
-            "place": {
-                "action_obj_names": ["square_ring"],
-                "anchor_obj_names": ["square_base", "pillar0", "pillar1", "pillar2"],
-                "action_pose_name": "square_ring",
-                "anchor_pose_name": "square_base",
-            },
-        },
-    },
-    # THIS ONE SEEMS TO BE BROKEN
-    "insert_usb_in_computer": {
-        "task_class": InsertUsbInComputer,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["usb", "usb_visual0", "usb_visual1", "tip"],
-            },
-            "place": {
-                "action_obj_names": ["usb", "usb_visual0", "usb_visual1", "tip"],
-                "anchor_obj_names": ["computer", "computer_visual"],
-            },
-        },
-    },
-    "phone_on_base": {
-        "task_class": PhoneOnBase,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["phone", "phone_visual"],
-                "action_pose_name": "gripper",
-                "anchor_pose_name": "phone_visual",
-            },
-            "place": {
-                "action_obj_names": ["phone", "phone_visual"],
-                "anchor_obj_names": ["phone_case", "phone_case_visual"],
-                "action_pose_name": "phone_visual",
-                "anchor_pose_name": "phone_case_visual",
-            },
-        },
-    },
-    "put_toilet_roll_on_stand": {
-        "task_class": PutToiletRollOnStand,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["toilet_roll_visual"],
-                "action_pose_name": "gripper",
-                "anchor_pose_name": "toilet_roll_visual",
-            },
-            "place": {
-                "action_obj_names": ["toilet_roll_visual"],
-                "anchor_obj_names": ["holder_visual", "stand_base"],
-                "action_pose_name": "toilet_roll_visual",
-                "anchor_pose_name": "holder_visual",
-            },
-        },
-    },
-    "place_hanger_on_rack": {
-        "task_class": PlaceHangerOnRack,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["clothes_hanger_visual"],
-                "action_pose_name": "gripper",
-                "anchor_pose_name": "clothes_hanger_visual",
-            },
-            "place": {
-                "action_obj_names": ["clothes_hanger_visual"],
-                "anchor_obj_names": [
-                    "clothes_rack",
-                    "clothes_rack_sub2",
-                    "clothes_rack_sub3",
-                ],
-                "action_pose_name": "clothes_hanger_visual",
-                "anchor_pose_name": "clothes_rack",
-            },
-        },
-    },
-    "solve_puzzle": {
-        "task_class": SolvePuzzle,
-        "phase": {
-            "grasp": {
-                "action_obj_names": [
-                    "Panda_leftfinger_visual",
-                    "Panda_rightfinger_visual",
-                    "Panda_gripper_visual",
-                ],
-                "anchor_obj_names": ["solve_puzzle_piece_visual2"],
-                "action_pose_name": "gripper",
-                "anchor_pose_name": "solve_puzzle_piece_visual2",
-            },
-            "place": {
-                "action_obj_names": ["solve_puzzle_piece_visual2"],
-                "anchor_obj_names": ["solve_puzzle_piece1"]
-                + [f"solve_puzzle_piece{i}" for i in range(3, 25)],
-                "action_pose_name": "solve_puzzle_piece_visual2",
-                "anchor_pose_name": "solve_puzzle_piece1",
-            },
-        },
-    },
-}
+from rpad.rlbench_utils.keyframing_pregrasp import keypoint_discovery_pregrasp
+from rpad.rlbench_utils.task_info import GRIPPER_POSE_NAME, TASK_DICT
 
 
 def get_rgb_point_cloud_by_object_handles(rgb, point_cloud, seg_labels, handles):
@@ -315,9 +149,11 @@ class RLBenchPlacementDataset(data.Dataset):
         self,
         dataset_root: str,
         task_name: str = "stack_wine",
-        n_demos: int = 10,
-        phase: StackWinePhase = StackWinePhase.GRASP,
+        demos: Union[Literal["all"], List[int]] = "all",
+        phase: str = "grasp",
+        use_first_as_init_keyframe: bool = True,
         cache: bool = True,
+        debugging: bool = False,
     ) -> None:
         """Dataset for RL-Bench placement tasks.
 
@@ -328,12 +164,28 @@ class RLBenchPlacementDataset(data.Dataset):
 
         self.dataset_root = dataset_root
         self.task_name = task_name
-        self.n_demos = n_demos
+        if demos == "all":
+            self.n_demos = len(
+                os.listdir(
+                    os.path.join(dataset_root, task_name, f"variation0", "episodes")
+                )
+            )
+            self.demos = list(range(self.n_demos))
+        else:
+            self.n_demos = len(demos)
+            self.demos = demos
+
         self.phase = phase
         self.variation = 0
+        self.debugging = debugging
+        self.use_first_as_init_keyframe = use_first_as_init_keyframe
 
         if self.task_name not in TASK_DICT:
             raise ValueError(f"Task name {self.task_name} not supported.")
+
+        # Assert that the phase is in the task names.
+        if phase != "all" and phase not in TASK_DICT[task_name]["phase"]:
+            raise ValueError(f"Phase {phase} not supported for task {task_name}.")
 
         handle_mapping = load_handle_mapping(
             self.dataset_root, self.task_name, self.variation
@@ -359,13 +211,22 @@ class RLBenchPlacementDataset(data.Dataset):
             self.memory = None
 
     def __len__(self) -> int:
-        return self.n_demos
+        if self.phase == "all":
+            return self.n_demos * len(TASK_DICT[self.task_name]["phase_order"])
+        else:
+            return self.n_demos
 
     # We also cache in memory, since all the transformations are the same.
     # Saves a lot of time when loading the dataset, but don't have to worry
     # about logic changes after the fact.
-    @functools.lru_cache(maxsize=100)
+    # @functools.lru_cache(maxsize=100)
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
+        # If we're using "all" as the phase, then we'll just sequence the dataset
+        # back to back.
+        if self.phase == "all":
+            og_index = index
+            index = index % self.n_demos
+
         # NOTE: We are caching the outputs since it's a royal pain to load the
         # demonstrations from disk. But this means that we'll have to be careful
         # whenever we re-generate the demonstrations to delete the cache.
@@ -389,30 +250,47 @@ class RLBenchPlacementDataset(data.Dataset):
                 task_low_dim_state=True,
             ),
             random_selection=False,
-            from_episode_number=index,
+            from_episode_number=self.demos[index],
         )[0]
 
-        # Each demonstration has a list of poses, which are the states of the
-        low_dim_state_dict = load_state_pos_dict(
-            self.dataset_root, self.task_name, self.variation, index
-        )
+        keyframes = keypoint_discovery_pregrasp(demo)
 
-        initial_obs = demo[0]
+        # Get the index of the phase into keypoints.
+        if self.phase == "all":
+            phase_ix = og_index // self.n_demos
+            phase = TASK_DICT[self.task_name]["phase_order"][phase_ix]
+
+        else:
+            phase_ix = TASK_DICT[self.task_name]["phase_order"].index(self.phase)
+            phase = self.phase
+
+        phase_onehot = np.zeros(len(TASK_DICT[self.task_name]["phase_order"]))
+        phase_onehot[phase_ix] = 1
+
+        # Select an observation to use as the initial observation.
+        if self.use_first_as_init_keyframe or phase_ix == 0:
+            initial_obs = demo[0]
+        else:
+            initial_obs = demo[keyframes[phase_ix - 1]]
 
         # Find the first grasp instance
-        if self.phase == "grasp":
-            first_grasp_ix = list(
-                filter(lambda t: t[1].gripper_open == 0.0, enumerate(demo))
-            )[0][0]
+        key_obs = demo[keyframes[phase_ix]]
 
-            last_open_ix = first_grasp_ix - 1
-            assert last_open_ix >= 0
-
-            key_obs = demo[last_open_ix]
-        elif self.phase == "place":
-            key_obs = demo[-1]
-        else:
-            raise ValueError(f"Phase {self.phase} not supported.")
+        if self.debugging:
+            return {
+                "keyframes": keyframes,
+                "demo": demo,
+                "initial_obs": initial_obs,
+                "key_obs": key_obs,
+                "init_front_rgb": torch.from_numpy(initial_obs.front_rgb),
+                "key_front_rgb": torch.from_numpy(key_obs.front_rgb),
+                "init_front_mask": torch.from_numpy(
+                    initial_obs.front_mask.astype(np.int32)
+                ),
+                "key_front_mask": torch.from_numpy(key_obs.front_mask.astype(np.int32)),
+                "phase": phase,
+                "phase_onehot": torch.from_numpy(phase_onehot),
+            }
 
         # Merge all the initial point clouds and masks into one.
         init_rgb, init_point_cloud, init_mask = obs_to_rgb_point_cloud(initial_obs)
@@ -425,7 +303,7 @@ class RLBenchPlacementDataset(data.Dataset):
             init_rgb,
             init_point_cloud,
             init_mask,
-            self.names_to_handles[self.phase]["action_obj_names"],
+            self.names_to_handles[phase]["action_obj_names"],
         )
         (
             init_anchor_rgb,
@@ -434,7 +312,7 @@ class RLBenchPlacementDataset(data.Dataset):
             init_rgb,
             init_point_cloud,
             init_mask,
-            self.names_to_handles[self.phase]["anchor_obj_names"],
+            self.names_to_handles[phase]["anchor_obj_names"],
         )
 
         # Merge all the key point clouds and masks into one.
@@ -445,24 +323,42 @@ class RLBenchPlacementDataset(data.Dataset):
             key_rgb,
             key_point_cloud,
             key_mask,
-            self.names_to_handles[self.phase]["action_obj_names"],
+            self.names_to_handles[phase]["action_obj_names"],
         )
         key_anchor_rgb, key_anchor_point_cloud = get_rgb_point_cloud_by_object_handles(
             key_rgb,
             key_point_cloud,
             key_mask,
-            self.names_to_handles[self.phase]["anchor_obj_names"],
+            self.names_to_handles[phase]["anchor_obj_names"],
+        )
+
+        # Each demonstration has a list of poses, which are the states of the various objects.
+        low_dim_state_dict = load_state_pos_dict(
+            self.dataset_root, self.task_name, self.variation, index
         )
 
         def extract_pose(obs, key):
             # Extract the positions.
-            pose_name = TASK_DICT[self.task_name]["phase"][self.phase][key]
-            if pose_name == "gripper":
+            pose_name = TASK_DICT[self.task_name]["phase"][phase][key]
+            if pose_name == GRIPPER_POSE_NAME:
                 action_pq = obs.gripper_pose
             else:
-                start = low_dim_state_dict[pose_name]
-                end = start + 7
-                action_pq = obs.task_low_dim_state[start:end]
+                # TODO: This is a bit of a hack to handle the fact that the demos don't
+                # currently output the same stuff.
+                if "custom_lowdim" in TASK_DICT[self.task_name]:
+                    start, v_len = TASK_DICT[self.task_name]["custom_lowdim"][pose_name]
+                    end = start + v_len
+
+                    if v_len == 3:
+                        action_p = obs.task_low_dim_state[start:end]
+                        action_q = np.array([1, 0, 0, 0])
+                        action_pq = np.concatenate((action_p, action_q))
+                    else:
+                        action_pq = obs.task_low_dim_state[start:end]
+                else:
+                    start = low_dim_state_dict[pose_name]
+                    end = start + 7
+                    action_pq = obs.task_low_dim_state[start:end]
 
             # Convert to a 4x4 matrix.
             T_action_world = np.eye(4)
@@ -490,4 +386,13 @@ class RLBenchPlacementDataset(data.Dataset):
             "T_action_key_world": torch.from_numpy(T_action_key_world),
             "T_anchor_key_world": torch.from_numpy(T_anchor_key_world),
             "T_init_key": torch.from_numpy(T_init_key),
+            # Also return some rgb images for visualization.
+            "init_front_rgb": torch.from_numpy(initial_obs.front_rgb),
+            "key_front_rgb": torch.from_numpy(key_obs.front_rgb),
+            "init_front_mask": torch.from_numpy(
+                initial_obs.front_mask.astype(np.int32)
+            ),
+            "key_front_mask": torch.from_numpy(key_obs.front_mask.astype(np.int32)),
+            "phase": phase,
+            "phase_onehot": torch.from_numpy(phase_onehot),
         }

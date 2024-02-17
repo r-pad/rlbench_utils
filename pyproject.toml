@@ -11,6 +11,9 @@ dependencies = [
   "torch",
   "torchvision",
 
+  # Internal rpad requirements.
+  "rpad-visualize-3d @ git+https://github.com/r-pad/visualize_3d.git",
+
   # Pyrep requirements. https://github.com/stepjam/PyRep/blob/master/requirements.txt
   "pyrep", # Should already be installed.
   "numpy",
