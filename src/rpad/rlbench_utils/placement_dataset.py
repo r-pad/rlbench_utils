@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+from enum import Enum
 from typing import Dict, List, Literal, Union, cast
 
 import numpy as np
@@ -16,7 +17,7 @@ from rlbench.observation_config import CameraConfig, ObservationConfig
 from scipy.spatial.transform import Rotation as R
 
 from rpad.rlbench_utils.keyframing_pregrasp import keypoint_discovery_pregrasp
-from rpad.rlbench_utils.task_info import GRIPPER_POSE_NAME, TASK_DICT
+from rpad.rlbench_utils.task_info import GRIPPER_OBJ_NAMES, GRIPPER_POSE_NAME, TASK_DICT
 
 
 def get_rgb_point_cloud_by_object_handles(rgb, point_cloud, seg_labels, handles):
@@ -144,6 +145,52 @@ def load_state_pos_dict(
     return cast(Dict[str, int], state_pos_dict)
 
 
+BACKGROUND_NAMES = [
+    "ResizableFloor_5_25_visibleElement",
+    "Wall3",
+    "diningTable_visible",
+    "workspace",
+]
+
+ROBOT_NONGRIPPER_NAMES = [
+    "Panda_link0_visual",
+    "Panda_link1_visual",
+    "Panda_link2_visual",
+    "Panda_link3_visual",
+    "Panda_link4_visual",
+    "Panda_link5_visual",
+    "Panda_link6_visual",
+    # "Panda_link7_visual",
+]
+
+
+def filter_out_names(rgb, point_cloud, mask, handlemapping, names=BACKGROUND_NAMES):
+    # Get the indices of the background.
+    background_handles = [handlemapping[name] for name in names]
+    background_indices = np.isin(mask, background_handles).reshape((-1))
+
+    # Get the indices of the foreground.
+    foreground_indices = ~background_indices
+
+    # Get the foreground rgb and point cloud.
+    foreground_rgb = rgb[foreground_indices]
+    foreground_point_cloud = point_cloud[foreground_indices]
+
+    return foreground_rgb, foreground_point_cloud
+
+
+class ActionMode(str, Enum):
+    GRIPPER_AND_OBJECT = "gripper_and_object"
+    OBJECT = "object"
+
+
+class AnchorMode(str, Enum):
+    RAW = "raw"
+    BACKGROUND_REMOVED = "background_removed"
+    BACKGROUND_ROBOT_REMOVED = "background_robot_removed"
+    SINGLE_OBJECT = "single_object"
+
+
 class RLBenchPlacementDataset(data.Dataset):
     def __init__(
         self,
@@ -154,6 +201,8 @@ class RLBenchPlacementDataset(data.Dataset):
         use_first_as_init_keyframe: bool = True,
         cache: bool = True,
         debugging: bool = False,
+        anchor_mode: AnchorMode = AnchorMode.SINGLE_OBJECT,
+        action_mode: ActionMode = ActionMode.OBJECT,
     ) -> None:
         """Dataset for RL-Bench placement tasks.
 
@@ -190,6 +239,7 @@ class RLBenchPlacementDataset(data.Dataset):
         handle_mapping = load_handle_mapping(
             self.dataset_root, self.task_name, self.variation
         )
+        self.handle_mapping = handle_mapping
 
         def leaf_fn(path, x):
             if path[1] == "action_obj_names" or path[1] == "anchor_obj_names":
@@ -202,6 +252,13 @@ class RLBenchPlacementDataset(data.Dataset):
         self.names_to_handles = tree.map_structure_with_path(
             leaf_fn, TASK_DICT[self.task_name]["phase"]
         )
+
+        self.gripper_handles = [handle_mapping[name] for name in GRIPPER_OBJ_NAMES]
+
+        if isinstance(anchor_mode, bool):
+            raise ValueError("Anchor mode must be one of the AnchorMode enum values.")
+        self.action_mode = action_mode
+        self.anchor_mode = anchor_mode
 
         if cache:
             self.memory = Memory(
@@ -295,24 +352,80 @@ class RLBenchPlacementDataset(data.Dataset):
         # Merge all the initial point clouds and masks into one.
         init_rgb, init_point_cloud, init_mask = obs_to_rgb_point_cloud(initial_obs)
 
+        action_handles = self.names_to_handles[phase]["action_obj_names"]
+        if self.action_mode == ActionMode.GRIPPER_AND_OBJECT:
+            action_handles = action_handles + self.gripper_handles
+        elif self.action_mode == ActionMode.OBJECT:
+            pass
+        else:
+            raise ValueError("Action mode must be one of the ActionMode enum values.")
+
         # Split the initial point cloud and rgb into action and anchor.
         (
             init_action_rgb,
             init_action_point_cloud,
         ) = get_rgb_point_cloud_by_object_handles(
-            init_rgb,
-            init_point_cloud,
-            init_mask,
-            self.names_to_handles[phase]["action_obj_names"],
+            init_rgb, init_point_cloud, init_mask, action_handles
         )
-        (
-            init_anchor_rgb,
-            init_anchor_point_cloud,
-        ) = get_rgb_point_cloud_by_object_handles(
-            init_rgb,
-            init_point_cloud,
-            init_mask,
-            self.names_to_handles[phase]["anchor_obj_names"],
+
+        def _select_anchor_vals(rgb, point_cloud, mask):
+            if self.anchor_mode == AnchorMode.RAW:
+                return rgb, point_cloud
+            elif self.anchor_mode == AnchorMode.BACKGROUND_REMOVED:
+                return filter_out_names(
+                    rgb, point_cloud, mask, self.handle_mapping, BACKGROUND_NAMES
+                )
+            elif self.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
+                return filter_out_names(
+                    rgb,
+                    point_cloud,
+                    mask,
+                    self.handle_mapping,
+                    BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
+                )
+            elif self.anchor_mode == AnchorMode.SINGLE_OBJECT:
+                return get_rgb_point_cloud_by_object_handles(
+                    rgb,
+                    point_cloud,
+                    mask,
+                    self.names_to_handles[phase]["anchor_obj_names"],
+                )
+            else:
+                raise ValueError(
+                    "Anchor mode must be one of the AnchorMode enum values."
+                )
+
+        # if self.anchor_mode == AnchorMode.RAW:
+        #     init_anchor_rgb = init_rgb
+        #     init_anchor_point_cloud = init_point_cloud
+        # elif self.anchor_mode == AnchorMode.BACKGROUND_REMOVED:
+        #     init_anchor_rgb, init_anchor_point_cloud = filter_out_names(
+        #         init_rgb,
+        #         init_point_cloud,
+        #         init_mask,
+        #         self.handle_mapping,
+        #         BACKGROUND_NAMES,
+        #     )
+        # elif self.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
+        #     init_anchor_rgb, init_anchor_point_cloud = filter_out_names(
+        #         init_rgb,
+        #         init_point_cloud,
+        #         init_mask,
+        #         self.handle_mapping,
+        #         BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
+        #     )
+        # elif self.anchor_mode == AnchorMode.SINGLE_OBJECT:
+        #     (
+        #         init_anchor_rgb,
+        #         init_anchor_point_cloud,
+        #     ) = get_rgb_point_cloud_by_object_handles(
+        #         init_rgb,
+        #         init_point_cloud,
+        #         init_mask,
+        #         self.names_to_handles[phase]["anchor_obj_names"],
+        #     )
+        init_anchor_rgb, init_anchor_point_cloud = _select_anchor_vals(
+            init_rgb, init_point_cloud, init_mask
         )
 
         # Merge all the key point clouds and masks into one.
@@ -320,16 +433,38 @@ class RLBenchPlacementDataset(data.Dataset):
 
         # Split the key point cloud and rgb into action and anchor.
         key_action_rgb, key_action_point_cloud = get_rgb_point_cloud_by_object_handles(
-            key_rgb,
-            key_point_cloud,
-            key_mask,
-            self.names_to_handles[phase]["action_obj_names"],
+            key_rgb, key_point_cloud, key_mask, action_handles
         )
-        key_anchor_rgb, key_anchor_point_cloud = get_rgb_point_cloud_by_object_handles(
-            key_rgb,
-            key_point_cloud,
-            key_mask,
-            self.names_to_handles[phase]["anchor_obj_names"],
+        # if self.anchor_mode == AnchorMode.RAW:
+        #     key_anchor_rgb = key_rgb
+        #     key_anchor_point_cloud = key_point_cloud
+        # elif self.anchor_mode == AnchorMode.BACKGROUND_REMOVED:
+        #     key_anchor_rgb, key_anchor_point_cloud = filter_out_names(
+        #         key_rgb,
+        #         key_point_cloud,
+        #         key_mask,
+        #         self.handle_mapping,
+        #         BACKGROUND_NAMES,
+        #     )
+        # elif self.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
+        #     key_anchor_rgb, key_anchor_point_cloud = filter_out_names(
+        #         key_rgb,
+        #         key_point_cloud,
+        #         key_mask,
+        #         self.handle_mapping,
+        #         BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
+        #     )
+        # elif self.anchor_mode == AnchorMode.SINGLE_OBJECT:
+        #     key_anchor_rgb, key_anchor_point_cloud = (
+        #         get_rgb_point_cloud_by_object_handles(
+        #             key_rgb,
+        #             key_point_cloud,
+        #             key_mask,
+        #             self.names_to_handles[phase]["anchor_obj_names"],
+        #         )
+        #     )
+        key_anchor_rgb, key_anchor_point_cloud = _select_anchor_vals(
+            key_rgb, key_point_cloud, key_mask
         )
 
         # Each demonstration has a list of poses, which are the states of the various objects.
@@ -346,6 +481,7 @@ class RLBenchPlacementDataset(data.Dataset):
                 # TODO: This is a bit of a hack to handle the fact that the demos don't
                 # currently output the same stuff.
                 if "custom_lowdim" in TASK_DICT[self.task_name]:
+                    raise NotImplementedError("i thought i fixed this")
                     start, v_len = TASK_DICT[self.task_name]["custom_lowdim"][pose_name]
                     end = start + v_len
 

@@ -25,6 +25,7 @@ GRIPPER_OBJ_NAMES = [
     "Panda_leftfinger_visual",
     "Panda_rightfinger_visual",
     "Panda_gripper_visual",
+    "Panda_link7_visual",  # This is the collar, which breaks symmetry.
 ]
 GRIPPER_POSE_NAME = "gripper"
 
@@ -71,10 +72,10 @@ PICK_AND_LIFT = {
         },
     },
     # First index = start ix, second index = length.
-    "custom_lowdim": {
-        BLOCK_POSE_NAME: (0, 3),
-        LIFT_GOAL_POSE_NAME: (3, 3),
-    },
+    # "custom_lowdim": {
+    #     BLOCK_POSE_NAME: (0, 3),
+    #     LIFT_GOAL_POSE_NAME: (3, 3),
+    # },
 }
 
 ########################################################################################
@@ -256,9 +257,9 @@ REACH_TARGET = {
             "gripper_open": True,
         },
     },
-    "custom_lowdim": {
-        TARGET_POSE_NAME: (0, 3),
-    },
+    # "custom_lowdim": {
+    #     TARGET_POSE_NAME: (0, 3),
+    # },
 }
 
 ########################################################################################
