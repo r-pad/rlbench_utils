@@ -273,6 +273,34 @@ class RLBenchPlacementDataset(data.Dataset):
         else:
             return self.n_demos
 
+    @staticmethod
+    def _load_keyframes(
+        dataset_root, variation, task_name, episode_index: int
+    ) -> List[int]:
+        demo = rlbench.utils.get_stored_demos(
+            amount=1,
+            image_paths=False,
+            dataset_root=dataset_root,
+            variation_number=variation,
+            task_name=task_name,
+            obs_config=ObservationConfig(
+                left_shoulder_camera=CameraConfig(image_size=(256, 256)),
+                right_shoulder_camera=CameraConfig(image_size=(256, 256)),
+                front_camera=CameraConfig(image_size=(256, 256)),
+                wrist_camera=CameraConfig(image_size=(256, 256)),
+                overhead_camera=CameraConfig(image_size=(256, 256)),
+                task_low_dim_state=True,
+            ),
+            random_selection=False,
+            from_episode_number=episode_index,
+        )[0]
+
+        keyframe_ixs = keypoint_discovery_pregrasp(demo)
+
+        keyframes = [demo[ix] for ix in keyframe_ixs]
+
+        return keyframes, demo[0]
+
     # We also cache in memory, since all the transformations are the same.
     # Saves a lot of time when loading the dataset, but don't have to worry
     # about logic changes after the fact.
@@ -288,29 +316,15 @@ class RLBenchPlacementDataset(data.Dataset):
         # demonstrations from disk. But this means that we'll have to be careful
         # whenever we re-generate the demonstrations to delete the cache.
         if self.memory is not None:
-            get_demo_fn = self.memory.cache(rlbench.utils.get_stored_demos)
+            load_keyframes_fn = self.memory.cache(self._load_keyframes)
         else:
-            get_demo_fn = rlbench.utils.get_stored_demos
+            load_keyframes_fn = self._load_keyframes
 
-        demo: rlbench.demo.Demo = get_demo_fn(
-            amount=1,
-            image_paths=False,
-            dataset_root=self.dataset_root,
-            variation_number=self.variation,
-            task_name=self.task_name,
-            obs_config=ObservationConfig(
-                left_shoulder_camera=CameraConfig(image_size=(256, 256)),
-                right_shoulder_camera=CameraConfig(image_size=(256, 256)),
-                front_camera=CameraConfig(image_size=(256, 256)),
-                wrist_camera=CameraConfig(image_size=(256, 256)),
-                overhead_camera=CameraConfig(image_size=(256, 256)),
-                task_low_dim_state=True,
-            ),
-            random_selection=False,
-            from_episode_number=self.demos[index],
-        )[0]
+        keyframes, first_frame = load_keyframes_fn(
+            self.dataset_root, self.variation, self.task_name, self.demos[index]
+        )
 
-        keyframes = keypoint_discovery_pregrasp(demo)
+        # breakpoint()
 
         # Get the index of the phase into keypoints.
         if self.phase == "all":
@@ -326,16 +340,17 @@ class RLBenchPlacementDataset(data.Dataset):
 
         # Select an observation to use as the initial observation.
         if self.use_first_as_init_keyframe or phase_ix == 0:
-            initial_obs = demo[0]
+            initial_obs = first_frame
         else:
-            initial_obs = demo[keyframes[phase_ix - 1]]
+            initial_obs = keyframes[phase_ix - 1]
 
         # Find the first grasp instance
-        key_obs = demo[keyframes[phase_ix]]
+        key_obs = keyframes[phase_ix]
 
         if self.debugging:
+            raise ValueError("Debugging not implemented.")
             return {
-                "keyframes": keyframes,
+                "keyframes": keyframe_ixs,
                 "demo": demo,
                 "initial_obs": initial_obs,
                 "key_obs": key_obs,
@@ -395,35 +410,6 @@ class RLBenchPlacementDataset(data.Dataset):
                     "Anchor mode must be one of the AnchorMode enum values."
                 )
 
-        # if self.anchor_mode == AnchorMode.RAW:
-        #     init_anchor_rgb = init_rgb
-        #     init_anchor_point_cloud = init_point_cloud
-        # elif self.anchor_mode == AnchorMode.BACKGROUND_REMOVED:
-        #     init_anchor_rgb, init_anchor_point_cloud = filter_out_names(
-        #         init_rgb,
-        #         init_point_cloud,
-        #         init_mask,
-        #         self.handle_mapping,
-        #         BACKGROUND_NAMES,
-        #     )
-        # elif self.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
-        #     init_anchor_rgb, init_anchor_point_cloud = filter_out_names(
-        #         init_rgb,
-        #         init_point_cloud,
-        #         init_mask,
-        #         self.handle_mapping,
-        #         BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
-        #     )
-        # elif self.anchor_mode == AnchorMode.SINGLE_OBJECT:
-        #     (
-        #         init_anchor_rgb,
-        #         init_anchor_point_cloud,
-        #     ) = get_rgb_point_cloud_by_object_handles(
-        #         init_rgb,
-        #         init_point_cloud,
-        #         init_mask,
-        #         self.names_to_handles[phase]["anchor_obj_names"],
-        #     )
         init_anchor_rgb, init_anchor_point_cloud = _select_anchor_vals(
             init_rgb, init_point_cloud, init_mask
         )
@@ -435,34 +421,6 @@ class RLBenchPlacementDataset(data.Dataset):
         key_action_rgb, key_action_point_cloud = get_rgb_point_cloud_by_object_handles(
             key_rgb, key_point_cloud, key_mask, action_handles
         )
-        # if self.anchor_mode == AnchorMode.RAW:
-        #     key_anchor_rgb = key_rgb
-        #     key_anchor_point_cloud = key_point_cloud
-        # elif self.anchor_mode == AnchorMode.BACKGROUND_REMOVED:
-        #     key_anchor_rgb, key_anchor_point_cloud = filter_out_names(
-        #         key_rgb,
-        #         key_point_cloud,
-        #         key_mask,
-        #         self.handle_mapping,
-        #         BACKGROUND_NAMES,
-        #     )
-        # elif self.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
-        #     key_anchor_rgb, key_anchor_point_cloud = filter_out_names(
-        #         key_rgb,
-        #         key_point_cloud,
-        #         key_mask,
-        #         self.handle_mapping,
-        #         BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
-        #     )
-        # elif self.anchor_mode == AnchorMode.SINGLE_OBJECT:
-        #     key_anchor_rgb, key_anchor_point_cloud = (
-        #         get_rgb_point_cloud_by_object_handles(
-        #             key_rgb,
-        #             key_point_cloud,
-        #             key_mask,
-        #             self.names_to_handles[phase]["anchor_obj_names"],
-        #         )
-        #     )
         key_anchor_rgb, key_anchor_point_cloud = _select_anchor_vals(
             key_rgb, key_point_cloud, key_mask
         )

@@ -30,6 +30,31 @@ GRIPPER_OBJ_NAMES = [
 GRIPPER_POSE_NAME = "gripper"
 
 ########################################################################################
+# insert_onto_square_peg
+########################################################################################
+
+
+INSERT_ONTO_SQUARE_PEG = {
+    "task_class": InsertOntoSquarePeg,
+    "phase_order": ["grasp", "place"],
+    "phase": {
+        "grasp": {
+            "action_obj_names": GRIPPER_OBJ_NAMES,
+            "anchor_obj_names": ["square_ring"],
+            "action_pose_name": GRIPPER_POSE_NAME,
+            "anchor_pose_name": "square_ring",
+        },
+        "place": {
+            "action_obj_names": ["square_ring"],
+            "anchor_obj_names": ["square_base", "pillar0", "pillar1", "pillar2"],
+            "action_pose_name": "square_ring",
+            "anchor_pose_name": "square_base",
+        },
+    },
+}
+
+
+########################################################################################
 # pick_and_lift
 ########################################################################################
 
@@ -109,6 +134,77 @@ PICK_UP_CUP = {
             "action_pose_name": CUP_POSE_NAME,
             "anchor_pose_name": CUP_POSE_NAME,
             "gripper_open": False,
+        },
+    },
+}
+
+########################################################################################
+# phone_on_base
+########################################################################################
+
+PHONE_OBJ_NAMES = ["phone_visual"]
+PHONE_CASE_OBJ_NAMES = ["phone_case_visual"]
+PHONE_POSE_NAME = "phone_visual"
+PHONE_CASE_POSE_NAME = "phone_case_visual"
+
+PHONE_ON_BASE = {
+    "task_class": PhoneOnBase,
+    "phase_order": ["pregrasp", "grasp", "lift", "place"],
+    "phase": {
+        "pregrasp": {
+            "action_obj_names": GRIPPER_OBJ_NAMES,
+            "anchor_obj_names": PHONE_OBJ_NAMES,
+            "action_pose_name": GRIPPER_POSE_NAME,
+            "anchor_pose_name": PHONE_POSE_NAME,
+            "gripper_open": True,
+        },
+        "grasp": {
+            "action_obj_names": GRIPPER_OBJ_NAMES,
+            "anchor_obj_names": PHONE_OBJ_NAMES,
+            "action_pose_name": GRIPPER_POSE_NAME,
+            "anchor_pose_name": PHONE_POSE_NAME,
+            "gripper_open": False,
+        },
+        "lift": {
+            "action_obj_names": PHONE_OBJ_NAMES,
+            "anchor_obj_names": PHONE_OBJ_NAMES,
+            "action_pose_name": PHONE_POSE_NAME,
+            "anchor_pose_name": PHONE_POSE_NAME,
+            "gripper_open": False,
+        },
+        "place": {
+            "action_obj_names": PHONE_OBJ_NAMES,
+            "anchor_obj_names": PHONE_CASE_OBJ_NAMES,
+            "action_pose_name": PHONE_POSE_NAME,
+            "anchor_pose_name": PHONE_CASE_POSE_NAME,
+            "gripper_open": True,
+        },
+    },
+}
+
+########################################################################################
+# place_hanger_on_rack
+########################################################################################
+
+PLACE_HANGER_ON_RACK = {
+    "task_class": PlaceHangerOnRack,
+    "phase_order": ["grasp", "place"],
+    "phase": {
+        "grasp": {
+            "action_obj_names": GRIPPER_OBJ_NAMES,
+            "anchor_obj_names": ["clothes_hanger_visual"],
+            "action_pose_name": GRIPPER_POSE_NAME,
+            "anchor_pose_name": "clothes_hanger_visual",
+        },
+        "place": {
+            "action_obj_names": ["clothes_hanger_visual"],
+            "anchor_obj_names": [
+                "clothes_rack",
+                "clothes_rack_sub2",
+                "clothes_rack_sub3",
+            ],
+            "action_pose_name": "clothes_hanger_visual",
+            "anchor_pose_name": "clothes_rack",
         },
     },
 }
@@ -239,6 +335,29 @@ PUT_MONEY_IN_SAFE = {
 }
 
 ########################################################################################
+# put_toilet_roll_on_stand
+########################################################################################
+
+PUT_TOILET_ROLL_ON_STAND = {
+    "task_class": PutToiletRollOnStand,
+    "phase_order": ["grasp", "place"],
+    "phase": {
+        "grasp": {
+            "action_obj_names": GRIPPER_OBJ_NAMES,
+            "anchor_obj_names": ["toilet_roll_visual"],
+            "action_pose_name": GRIPPER_POSE_NAME,
+            "anchor_pose_name": "toilet_roll_visual",
+        },
+        "place": {
+            "action_obj_names": ["toilet_roll_visual"],
+            "anchor_obj_names": ["holder_visual", "stand_base"],
+            "action_pose_name": "toilet_roll_visual",
+            "anchor_pose_name": "holder_visual",
+        },
+    },
+}
+
+########################################################################################
 # reach_target
 ########################################################################################
 
@@ -288,6 +407,30 @@ SLIDE_BLOCK_TO_TARGET = {
             "action_pose_name": GRIPPER_POSE_NAME,
             "anchor_pose_name": TARGET_POSE_NAME,
             "gripper_open": False,
+        },
+    },
+}
+
+########################################################################################
+# solve_puzzle
+########################################################################################
+
+SOLVE_PUZZLE = {
+    "task_class": SolvePuzzle,
+    "phase_order": ["grasp", "place"],
+    "phase": {
+        "grasp": {
+            "action_obj_names": GRIPPER_OBJ_NAMES,
+            "anchor_obj_names": ["solve_puzzle_piece_visual2"],
+            "action_pose_name": GRIPPER_POSE_NAME,
+            "anchor_pose_name": "solve_puzzle_piece_visual2",
+        },
+        "place": {
+            "action_obj_names": ["solve_puzzle_piece_visual2"],
+            "anchor_obj_names": ["solve_puzzle_piece1"]
+            + [f"solve_puzzle_piece{i}" for i in range(3, 25)],
+            "action_pose_name": "solve_puzzle_piece_visual2",
+            "anchor_pose_name": "solve_puzzle_piece1",
         },
     },
 }
@@ -445,23 +588,7 @@ RLBENCH_10_TASKS = [
 
 
 TASK_DICT = {
-    "insert_onto_square_peg": {
-        "task_class": InsertOntoSquarePeg,
-        "phase": {
-            "grasp": {
-                "action_obj_names": GRIPPER_OBJ_NAMES,
-                "anchor_obj_names": ["square_ring"],
-                "action_pose_name": GRIPPER_POSE_NAME,
-                "anchor_pose_name": "square_ring",
-            },
-            "place": {
-                "action_obj_names": ["square_ring"],
-                "anchor_obj_names": ["square_base", "pillar0", "pillar1", "pillar2"],
-                "action_pose_name": "square_ring",
-                "anchor_pose_name": "square_base",
-            },
-        },
-    },
+    "insert_onto_square_peg": INSERT_ONTO_SQUARE_PEG,
     # THIS ONE SEEMS TO BE BROKEN
     "insert_usb_in_computer": {
         "task_class": InsertUsbInComputer,
@@ -486,77 +613,8 @@ TASK_DICT = {
     "stack_wine": STACK_WINE,
     "take_money_out_safe": TAKE_MONEY_OUT_SAFE,
     "take_umbrella_out_of_umbrella_stand": TAKE_UMBRELLA_OUT_OF_UMBRELLA_STAND,
-    "phone_on_base": {
-        "task_class": PhoneOnBase,
-        "phase": {
-            "grasp": {
-                "action_obj_names": GRIPPER_OBJ_NAMES,
-                "anchor_obj_names": ["phone", "phone_visual"],
-                "action_pose_name": GRIPPER_POSE_NAME,
-                "anchor_pose_name": "phone_visual",
-            },
-            "place": {
-                "action_obj_names": ["phone", "phone_visual"],
-                "anchor_obj_names": ["phone_case", "phone_case_visual"],
-                "action_pose_name": "phone_visual",
-                "anchor_pose_name": "phone_case_visual",
-            },
-        },
-    },
-    "put_toilet_roll_on_stand": {
-        "task_class": PutToiletRollOnStand,
-        "phase": {
-            "grasp": {
-                "action_obj_names": GRIPPER_OBJ_NAMES,
-                "anchor_obj_names": ["toilet_roll_visual"],
-                "action_pose_name": GRIPPER_POSE_NAME,
-                "anchor_pose_name": "toilet_roll_visual",
-            },
-            "place": {
-                "action_obj_names": ["toilet_roll_visual"],
-                "anchor_obj_names": ["holder_visual", "stand_base"],
-                "action_pose_name": "toilet_roll_visual",
-                "anchor_pose_name": "holder_visual",
-            },
-        },
-    },
-    "place_hanger_on_rack": {
-        "task_class": PlaceHangerOnRack,
-        "phase": {
-            "grasp": {
-                "action_obj_names": GRIPPER_OBJ_NAMES,
-                "anchor_obj_names": ["clothes_hanger_visual"],
-                "action_pose_name": GRIPPER_POSE_NAME,
-                "anchor_pose_name": "clothes_hanger_visual",
-            },
-            "place": {
-                "action_obj_names": ["clothes_hanger_visual"],
-                "anchor_obj_names": [
-                    "clothes_rack",
-                    "clothes_rack_sub2",
-                    "clothes_rack_sub3",
-                ],
-                "action_pose_name": "clothes_hanger_visual",
-                "anchor_pose_name": "clothes_rack",
-            },
-        },
-    },
-    "solve_puzzle": {
-        "task_class": SolvePuzzle,
-        "phase": {
-            "grasp": {
-                "action_obj_names": GRIPPER_OBJ_NAMES,
-                "anchor_obj_names": ["solve_puzzle_piece_visual2"],
-                "action_pose_name": GRIPPER_POSE_NAME,
-                "anchor_pose_name": "solve_puzzle_piece_visual2",
-            },
-            "place": {
-                "action_obj_names": ["solve_puzzle_piece_visual2"],
-                "anchor_obj_names": ["solve_puzzle_piece1"]
-                + [f"solve_puzzle_piece{i}" for i in range(3, 25)],
-                "action_pose_name": "solve_puzzle_piece_visual2",
-                "anchor_pose_name": "solve_puzzle_piece1",
-            },
-        },
-    },
+    "phone_on_base": PHONE_ON_BASE,
+    "put_toilet_roll_on_stand": PUT_TOILET_ROLL_ON_STAND,
+    "place_hanger_on_rack": PLACE_HANGER_ON_RACK,
+    "solve_puzzle": SOLVE_PUZZLE,
 }
