@@ -467,6 +467,12 @@ class RLBenchPlacementDataset(data.Dataset):
         T_init_key = T_action_key_world @ np.linalg.inv(T_action_init_world)
         T_anchor_key_world = extract_pose(key_obs, "anchor_pose_name")
 
+        if hasattr(initial_obs, "ignore_collisions"):
+            ignore_collisions = initial_obs.ignore_collisions
+            ignore_collisions = torch.from_numpy(ignore_collisions.astype(np.int32))
+        else:
+            ignore_collisions = None
+
         return {
             "init_action_rgb": torch.from_numpy(init_action_rgb),
             "init_action_pc": torch.from_numpy(init_action_point_cloud),
@@ -489,4 +495,5 @@ class RLBenchPlacementDataset(data.Dataset):
             "key_front_mask": torch.from_numpy(key_obs.front_mask.astype(np.int32)),
             "phase": phase,
             "phase_onehot": torch.from_numpy(phase_onehot),
+            "ignore_collisions": ignore_collisions,
         }
