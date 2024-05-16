@@ -202,6 +202,12 @@ def get_anchor_points(
     handle_mapping=None,
     names_to_handles=None,
 ):
+    if use_from_simulator:
+        handle_mapping = {
+            name: sim.simGetObjectHandle(name)
+            for name in BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES
+        }
+
     if anchor_mode == AnchorMode.RAW:
         return rgb, point_cloud
     elif anchor_mode == AnchorMode.BACKGROUND_REMOVED:
