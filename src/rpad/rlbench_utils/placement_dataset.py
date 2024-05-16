@@ -240,9 +240,14 @@ def get_action_points(
     rgb,
     point_cloud,
     mask,
-    action_handles,
-    gripper_handles,
+    use_from_simulator=False,
+    action_handles=None,
+    gripper_handles=None,
 ):
+    if use_from_simulator:
+        action_handles = [sim.simGetObjectHandle(name) for name in action_handles]
+        gripper_handles = [sim.simGetObjectHandle(name) for name in gripper_handles]
+
     if action_mode == ActionMode.GRIPPER_AND_OBJECT:
         action_handles = action_handles + gripper_handles
     elif action_mode == ActionMode.OBJECT:
