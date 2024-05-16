@@ -240,6 +240,8 @@ def get_action_points(
     rgb,
     point_cloud,
     mask,
+    task_name,
+    phase,
     use_from_simulator=False,
     action_handles=None,
     gripper_handles=None,
