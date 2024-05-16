@@ -436,8 +436,10 @@ class RLBenchPlacementDataset(data.Dataset):
                 rgb,
                 point_cloud,
                 mask,
-                action_handles,
-                self.gripper_handles,
+                task_name=self.task_name,
+                phase=phase,
+                action_handles=action_handles,
+                gripper_handles=self.gripper_handles,
             )
 
         def _select_anchor_vals(rgb, point_cloud, mask):
