@@ -245,8 +245,10 @@ def get_action_points(
     gripper_handles=None,
 ):
     if use_from_simulator:
-        action_handles = [sim.simGetObjectHandle(name) for name in action_handles]
-        gripper_handles = [sim.simGetObjectHandle(name) for name in gripper_handles]
+        action_names = TASK_DICT[task_name]["phase"][phase]["action_obj_names"]
+        gripper_names = GRIPPER_OBJ_NAMES
+        action_handles = [sim.simGetObjectHandle(name) for name in action_names]
+        gripper_handles = [sim.simGetObjectHandle(name) for name in gripper_names]
 
     if action_mode == ActionMode.GRIPPER_AND_OBJECT:
         action_handles = action_handles + gripper_handles
