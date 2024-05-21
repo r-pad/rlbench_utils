@@ -199,7 +199,7 @@ def get_anchor_points(
     if use_from_simulator:
         handle_mapping = {
             name: sim.simGetObjectHandle(name)
-            for name in BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES
+            for name in BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES + GRIPPER_OBJ_NAMES
         }
 
     if anchor_mode == AnchorMode.RAW:
