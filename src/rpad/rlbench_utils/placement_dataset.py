@@ -209,13 +209,13 @@ def get_anchor_points(
             rgb, point_cloud, mask, handle_mapping, BACKGROUND_NAMES
         )
     elif anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
-        return filter_out_names(
-            rgb,
-            point_cloud,
-            mask,
-            handle_mapping,
-            BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
-        )
+        names = BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES
+
+        # If it's the first phase, we also omit the gripper.
+        if phase == TASK_DICT[task_name]["phase_order"][0]:
+            names += GRIPPER_OBJ_NAMES
+
+        return filter_out_names(rgb, point_cloud, mask, handle_mapping, names)
     elif anchor_mode == AnchorMode.SINGLE_OBJECT:
         if use_from_simulator:
             return get_rgb_point_cloud_by_object_names(
