@@ -140,13 +140,51 @@ def load_state_pos_dict(
 
 
 BACKGROUND_NAMES = [
+    "DefaultCamera",
+    "DefaultLightA",
+    "DefaultLightB",
+    "DefaultLightC",
+    "DefaultLightD",
+    "DefaultLights",
+    "DefaultNXViewCamera",
+    "DefaultNYViewCamera",
+    "DefaultNZViewCamera",
+    "DefaultXViewCamera",
+    "DefaultYViewCamera",
+    "DefaultZViewCamera",
+    "Dummy",
+    "Floor",
+    "FloorAnchor",
+    "ResizableFloor_5_25",
+    "ResizableFloor_5_25_element",
     "ResizableFloor_5_25_visibleElement",
+    "Roof",
     "Wall1",
     "Wall2",
     "Wall3",
     "Wall4",
-    "Roof",
+    "XYZCameraProxy",
+    "boundary",
+    "cam_cinematic_base",
+    "cam_cinematic_placeholder",
+    "cam_front",
+    "cam_front_mask",
+    "cam_over_shoulder_left",
+    "cam_over_shoulder_left_mask",
+    "cam_over_shoulder_right",
+    "cam_over_shoulder_right_mask",
+    "cam_overhead",
+    "cam_overhead_mask",
+    "cam_wrist",
+    "cam_wrist_mask",
+    "diningTable",
     "diningTable_visible",
+    "remoteApi",
+    "success",
+    "waypoint0",
+    "waypoint1",
+    "waypoint2",
+    "waypoint3",
     "workspace",
 ]
 
@@ -165,6 +203,7 @@ ROBOT_NONGRIPPER_NAMES = [
 def filter_out_names(rgb, point_cloud, mask, handlemapping, names=BACKGROUND_NAMES):
     # Get the indices of the background.
     background_handles = [handlemapping[name] for name in names]
+    background_handles.append(65535)  # It's -1, cast as uint16.
     background_indices = np.isin(mask, background_handles).reshape((-1))
 
     # Get the indices of the foreground.
