@@ -141,7 +141,11 @@ def load_state_pos_dict(
 
 BACKGROUND_NAMES = [
     "ResizableFloor_5_25_visibleElement",
+    "Wall1",
+    "Wall2",
     "Wall3",
+    "Wall4",
+    "Roof",
     "diningTable_visible",
     "workspace",
 ]
@@ -213,7 +217,10 @@ def get_anchor_points(
         names = BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES
 
         # If it's the first phase, we also omit the gripper.
-        if phase == TASK_DICT[task_name]["phase_order"][0] and gripper_in_first_phase:
+        if (
+            phase == TASK_DICT[task_name]["phase_order"][0]
+            and not gripper_in_first_phase
+        ):
             names += GRIPPER_OBJ_NAMES
 
         return filter_out_names(rgb, point_cloud, mask, handle_mapping, names)
