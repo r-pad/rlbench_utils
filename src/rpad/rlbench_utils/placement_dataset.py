@@ -244,10 +244,12 @@ def get_anchor_points(
     gripper_in_first_phase=True,
 ):
     if use_from_simulator:
-        handle_mapping = {
-            name: sim.simGetObjectHandle(name)
-            for name in BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES + GRIPPER_OBJ_NAMES
-        }
+        handle_mapping = {}
+        for name in BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES + GRIPPER_OBJ_NAMES:
+            try:
+                handle_mapping[name] = sim.simGetObjectHandle(name)
+            except RuntimeError:
+                logging.info(f"Object {name} not found in scene.")
 
     if anchor_mode == AnchorMode.RAW:
         return rgb, point_cloud
