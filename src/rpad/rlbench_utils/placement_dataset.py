@@ -202,7 +202,9 @@ ROBOT_NONGRIPPER_NAMES = [
 
 def filter_out_names(rgb, point_cloud, mask, handlemapping, names=BACKGROUND_NAMES):
     # Get the indices of the background.
-    background_handles = [handlemapping[name] for name in names]
+    background_handles = [
+        handlemapping[name] for name in names if name in handlemapping
+    ]
     background_handles.append(65535)  # It's -1, cast as uint16.
     background_indices = np.isin(mask, background_handles).reshape((-1))
 
