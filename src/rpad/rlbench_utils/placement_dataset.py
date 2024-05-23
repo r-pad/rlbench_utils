@@ -206,6 +206,7 @@ def filter_out_names(rgb, point_cloud, mask, handlemapping, names=BACKGROUND_NAM
         handlemapping[name] for name in names if name in handlemapping
     ]
     background_handles.append(65535)  # It's -1, cast as uint16.
+    background_handles.append(-1)
     background_indices = np.isin(mask, background_handles).reshape((-1))
 
     # Get the indices of the foreground.
