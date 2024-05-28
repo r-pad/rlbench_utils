@@ -289,7 +289,7 @@ PUT_KNIFE_ON_CHOPPING_BOARD = {
 
 DOLLAR_STACK_OBJ_NAMES = ["dollar_stack"]
 SAFE_OBJ_NAMES = ["safe_body", "safe_door"]
-DOLLAR_STACK_POSE_NAME = "dollar_stack"
+DOLLAR_STACK_POSE_NAME = "dollar_front_visual"
 SAFE_POSE_NAME = "safe_body"
 
 PUT_MONEY_IN_SAFE = {
@@ -496,7 +496,8 @@ STACK_WINE = {
 SAFE_OBJ_NAMES = ["safe_body", "safe_door"]
 MONEY_OBJ_NAMES = ["dollar_stack0", "dollar_back_visual0"]
 SAFE_POSE_NAME = "safe_body"
-MONEY_POSE_NAME = "dollar_stack0"
+# MONEY_POSE_NAME = "dollar_stack0"
+MONEY_POSE_NAME = "dollar_front_visual0"
 
 
 TAKE_MONEY_OUT_SAFE = {
