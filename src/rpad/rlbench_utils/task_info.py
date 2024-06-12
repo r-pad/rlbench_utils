@@ -496,7 +496,6 @@ STACK_WINE = {
 SAFE_OBJ_NAMES = ["safe_body", "safe_door"]
 MONEY_OBJ_NAMES = ["dollar_stack0", "dollar_back_visual0"]
 SAFE_POSE_NAME = "safe_body"
-# MONEY_POSE_NAME = "dollar_stack0"
 MONEY_POSE_NAME = "dollar_front_visual0"
 
 

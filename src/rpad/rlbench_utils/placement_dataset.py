@@ -222,6 +222,7 @@ def filter_out_names(rgb, point_cloud, mask, handlemapping, names=BACKGROUND_NAM
 class ActionMode(str, Enum):
     GRIPPER_AND_OBJECT = "gripper_and_object"
     OBJECT = "object"
+    GRIPPER = "gripper"
 
 
 class AnchorMode(str, Enum):
@@ -308,6 +309,8 @@ def get_action_points(
         action_handles = action_handles + gripper_handles
     elif action_mode == ActionMode.OBJECT:
         pass
+    elif action_mode == ActionMode.GRIPPER:
+        action_handles = gripper_handles
     else:
         raise ValueError("Action mode must be one of the ActionMode enum values.")
 
